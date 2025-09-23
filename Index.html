@@ -255,7 +255,6 @@
     <div class="controls">
         <input type="text" class="search-box" placeholder="Buscar memes..." id="searchInput">
         <button class="btn" onclick="shuffleGallery()">🎲 Aleatorio</button>
-        <button class="btn" onclick="downloadAll()">📁 Descargar Todos</button>
     </div>
 
     <div class="gallery" id="gallery">
@@ -281,21 +280,123 @@
         let currentMemes = [];
         let currentImageIndex = 0;
 
-        // Generar automáticamente la lista de tus 650 memes
-        const memes = [];
-        for (let i = 1; i <= 650; i++) {
-            const paddedNumber = i.toString().padStart(4, '0');
-            memes.push({
-                filename: `Capitan America meme_${paddedNumber}.jpeg`,
-                title: `Capitán América Meme #${i}`
+        // Detectar automáticamente todos los memes disponibles
+        let memes = [];
+
+        // Función para detectar memes existentes
+        async function detectMemes() {
+            const detectedMemes = [];
+            let consecutiveFailures = 0;
+            const maxFailures = 50; // Si fallan 50 seguidos, paramos
+            
+            for (let i = 1; i <= 2000; i++) { // Límite máximo de 2000 por seguridad
+                const paddedNumber = i.toString().padStart(4, '0');
+                const filename = `Capitan America meme_${paddedNumber}.jpeg`;
+                
+                try {
+                    // Verificar si la imagen existe
+                    const exists = await checkImageExists(`memes/${filename}`);
+                    
+                    if (exists) {
+                        detectedMemes.push({
+                            filename: filename,
+                            title: `Capitán América Meme #${i}`
+                        });
+                        consecutiveFailures = 0;
+                    } else {
+                        consecutiveFailures++;
+                        // Si llevamos muchos fallos seguidos, probablemente ya no hay más
+                        if (consecutiveFailures >= maxFailures) {
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    consecutiveFailures++;
+                    if (consecutiveFailures >= maxFailures) {
+                        break;
+                    }
+                }
+                
+                // Mostrar progreso cada 100
+                if (i % 100 === 0) {
+                    updateLoadingMessage(`Detectando memes... encontrados ${detectedMemes.length}`);
+                }
+            }
+            
+            return detectedMemes;
+        }
+
+        // Verificar si una imagen existe
+        function checkImageExists(url) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(true);
+                img.onerror = () => resolve(false);
+                img.src = url;
+                
+                // Timeout de 3 segundos
+                setTimeout(() => resolve(false), 3000);
             });
         }
 
-        // Inicializar la galería
-        function initGallery() {
-            allMemes = [...memes];
-            currentMemes = [...memes];
-            renderGallery();
+        // Mostrar mensaje de carga
+        function updateLoadingMessage(message) {
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = `
+                <div style="text-align: center; color: white; font-size: 1.2rem; grid-column: 1 / -1;">
+                    <div style="margin: 50px 0;">
+                        <div style="margin-bottom: 20px;">🔍 ${message}</div>
+                        <div style="width: 100%; max-width: 400px; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; margin: 0 auto; overflow: hidden;">
+                            <div style="height: 100%; background: linear-gradient(90deg, #ff6b6b, #4ecdc4); animation: loading 2s infinite linear;"></div>
+                        </div>
+                    </div>
+                </div>
+                <style>
+                    @keyframes loading {
+                        0% { transform: translateX(-100%); }
+                        100% { transform: translateX(100%); }
+                    }
+                </style>
+            `;
+        }
+
+        // Inicializar la galería con detección automática
+        async function initGallery() {
+            updateLoadingMessage('Iniciando detección de memes...');
+            
+            try {
+                memes = await detectMemes();
+                allMemes = [...memes];
+                currentMemes = [...memes];
+                
+                if (memes.length > 0) {
+                    // Actualizar el título con el número total
+                    const headerP = document.querySelector('.header p');
+                    headerP.textContent = `Colección completa de ${memes.length} memes del ascensor - "Hail Hydra" y más`;
+                    
+                    renderGallery();
+                } else {
+                    // Si no se encontraron memes, mostrar mensaje
+                    document.getElementById('gallery').innerHTML = `
+                        <div style="text-align: center; color: white; font-size: 1.5rem; grid-column: 1 / -1; margin-top: 50px;">
+                            😕 No se encontraron memes en la carpeta 'memes/'<br>
+                            <small style="font-size: 1rem; opacity: 0.8; margin-top: 10px; display: block;">
+                                Asegúrate de que los archivos sigan el formato: "Capitan America meme_0001.jpeg"
+                            </small>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error detectando memes:', error);
+                document.getElementById('gallery').innerHTML = `
+                    <div style="text-align: center; color: white; font-size: 1.5rem; grid-column: 1 / -1; margin-top: 50px;">
+                        ⚠️ Error al cargar los memes<br>
+                        <small style="font-size: 1rem; opacity: 0.8; margin-top: 10px; display: block;">
+                            Por favor, recarga la página
+                        </small>
+                    </div>
+                `;
+            }
         }
 
         // Renderizar la galería
@@ -409,22 +510,6 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        }
-
-        // Descargar todos (esto realmente solo puede abrir cada imagen)
-        function downloadAll() {
-            if (confirm('¿Quieres abrir todas las imágenes para descargarlas? (Puede ser lento con 650 imágenes)')) {
-                currentMemes.forEach((meme, index) => {
-                    setTimeout(() => {
-                        const link = document.createElement('a');
-                        link.href = `memes/${meme.filename}`;
-                        link.download = meme.filename;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    }, index * 100); // Espaciar las descargas
-                });
-            }
         }
 
         // Inicializar cuando carga la página

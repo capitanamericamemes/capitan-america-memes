@@ -512,8 +512,35 @@
             document.body.removeChild(link);
         }
 
+        // Contador de visitas
+        function initVisitCounter() {
+            fetch('https://api.countapi.xyz/hit/capitanamericamemes/visits')
+                .then(response => response.json())
+                .then(data => {
+                    const counter = document.createElement('div');
+                    counter.style.cssText = `
+                        position: fixed;
+                        bottom: 20px;
+                        right: 20px;
+                        background: rgba(0,0,0,0.8);
+                        color: white;
+                        padding: 10px 15px;
+                        border-radius: 20px;
+                        font-size: 0.9rem;
+                        z-index: 100;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                    `;
+                    counter.innerHTML = `👥 ${data.value.toLocaleString()} visitas`;
+                    document.body.appendChild(counter);
+                })
+                .catch(error => console.log('Error loading visit counter:', error));
+        }
+
         // Inicializar cuando carga la página
-        window.addEventListener('load', initGallery);
+        window.addEventListener('load', function() {
+            initGallery();
+            initVisitCounter();
+        });
     </script>
 </body>
 </html>

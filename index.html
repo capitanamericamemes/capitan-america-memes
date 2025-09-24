@@ -539,9 +539,18 @@
             document.body.removeChild(link);
         }
 
-        // Contador de visitas mejorado
+        // Contador de visitas con GoatCounter
         function initVisitCounter() {
+            // Cargar el script de GoatCounter
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://gc.zgo.at/count.js';
+            script.setAttribute('data-goatcounter', 'https://capamericamemes.goatcounter.com/count');
+            document.body.appendChild(script);
+            
+            // Crear contador visual simple
             const counter = document.createElement('div');
+            counter.id = 'visit-counter';
             counter.style.cssText = `
                 position: fixed;
                 bottom: 20px;
@@ -553,31 +562,38 @@
                 font-size: 0.9rem;
                 z-index: 100;
                 box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                display: flex;
-                align-items: center;
-                gap: 8px;
             `;
             
-            // Crear imagen del contador
-            const badgeImg = document.createElement('img');
-            badgeImg.style.cssText = 'height: 20px; border-radius: 10px; vertical-align: middle;';
-            badgeImg.src = 'https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fcapitanamericamemes.github.io%2Fcapitan-america-memes&count_bg=%23FF6B6B&title_bg=%23555555&icon=shield-alt&icon_color=%23E7E7E7&title=visitas&edge_flat=false';
+            // Obtener visitas desde localStorage como fallback
+            let visits = parseInt(localStorage.getItem('page-visits') || '0');
+            visits++;
+            localStorage.setItem('page-visits', visits.toString());
             
-            // Mostrar "Cargando..." hasta que se cargue la imagen
-            counter.innerHTML = `<span>👥 Cargando visitas...</span>`;
-            
-            // Cuando se carga la imagen, mostrar el badge
-            badgeImg.onload = function() {
-                counter.innerHTML = '';
-                counter.appendChild(badgeImg);
-            };
-            
-            // Si falla la carga, mostrar mensaje básico
-            badgeImg.onerror = function() {
-                counter.innerHTML = `<span>👥 Contador no disponible</span>`;
-            };
-            
+            counter.innerHTML = `👥 ${visits.toLocaleString()} visitas`;
             document.body.appendChild(counter);
+            
+            // Intentar obtener datos reales después
+            setTimeout(() => {
+                fetchRealVisitCount(counter);
+            }, 2000);
+        }
+        
+        // Intentar obtener contador real
+        function fetchRealVisitCount(counterElement) {
+            // Usar una API proxy que funcione con CORS
+            fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://goatcounter.com/api/v0/export?format=json'))
+                .then(response => response.json())
+                .then(data => {
+                    // Si funciona, actualizar con datos reales
+                    if (data && data.contents) {
+                        const realCount = JSON.parse(data.contents).length || parseInt(localStorage.getItem('page-visits') || '1');
+                        counterElement.innerHTML = `👥 ${realCount.toLocaleString()} visitas`;
+                    }
+                })
+                .catch(() => {
+                    // Si falla, mantener el contador local
+                    console.log('Using local visit counter');
+                });
         }
 
         // Inicializar cuando carga la página

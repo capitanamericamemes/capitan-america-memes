@@ -284,47 +284,74 @@
         let memes = [];
 
         // Función para detectar memes existentes
-        async function detectMemes() {
-            const detectedMemes = [];
-            let consecutiveFailures = 0;
-            const maxFailures = 50; // Si fallan 50 seguidos, paramos
+    async function detectMemes() {
+        const detectedMemes = [];
+        const batchSize = 20; // Verificar 20 imágenes simultáneamente
+        let consecutiveFailures = 0;
+        const maxFailures = 50;
+        
+        for (let startIndex = 1; startIndex <= 2000; startIndex += batchSize) {
+            // Crear lote de verificaciones en paralelo
+            const batchPromises = [];
+            const batchNumbers = [];
             
-            for (let i = 1; i <= 2000; i++) { // Límite máximo de 2000 por seguridad
-                const paddedNumber = i.toString().padStart(4, '0');
+            for (let i = 0; i < batchSize && (startIndex + i) <= 2000; i++) {
+                const currentNumber = startIndex + i;
+                const paddedNumber = currentNumber.toString().padStart(4, '0');
                 const filename = `Capitan America meme_${paddedNumber}.jpeg`;
                 
-                try {
-                    // Verificar si la imagen existe
-                    const exists = await checkImageExists(`memes/${filename}`);
-                    
-                    if (exists) {
+                batchNumbers.push(currentNumber);
+                batchPromises.push(checkImageExists(`memes/${filename}`));
+            }
+            
+            try {
+                // Esperar a que termine todo el lote
+                const results = await Promise.all(batchPromises);
+                
+                // Procesar resultados
+                let foundInBatch = false;
+                for (let i = 0; i < results.length; i++) {
+                    if (results[i]) {
+                        const currentNumber = batchNumbers[i];
+                        const paddedNumber = currentNumber.toString().padStart(4, '0');
+                        const filename = `Capitan America meme_${paddedNumber}.jpeg`;
+                        
                         detectedMemes.push({
                             filename: filename,
-                            title: `Capitán América Meme #${i}`
+                            title: `Capitán América Meme #${currentNumber}`
                         });
+                        foundInBatch = true;
                         consecutiveFailures = 0;
-                    } else {
-                        consecutiveFailures++;
-                        // Si llevamos muchos fallos seguidos, probablemente ya no hay más
-                        if (consecutiveFailures >= maxFailures) {
-                            break;
-                        }
                     }
-                } catch (error) {
-                    consecutiveFailures++;
+                }
+                
+                if (!foundInBatch) {
+                    consecutiveFailures += batchSize;
                     if (consecutiveFailures >= maxFailures) {
                         break;
                     }
                 }
                 
-                // Mostrar progreso cada 100
-                if (i % 100 === 0) {
-                    updateLoadingMessage(`Detectando memes... encontrados ${detectedMemes.length}`);
+                // Mostrar progreso
+                updateLoadingMessage(`Detectando memes... encontrados ${detectedMemes.length}`);
+                
+            } catch (error) {
+                consecutiveFailures += batchSize;
+                if (consecutiveFailures >= maxFailures) {
+                    break;
                 }
             }
-            
-            return detectedMemes;
         }
+    
+        // Ordenar los memes por número (importante porque ahora se procesan en lotes)
+        detectedMemes.sort((a, b) => {
+            const numA = parseInt(a.title.match(/#(\d+)/)[1]);
+            const numB = parseInt(b.title.match(/#(\d+)/)[1]);
+            return numA - numB;
+        });
+        
+        return detectedMemes;
+    }
 
         // Verificar si una imagen existe
         function checkImageExists(url) {
@@ -335,7 +362,7 @@
                 img.src = url;
                 
                 // Timeout de 3 segundos
-                setTimeout(() => resolve(false), 3000);
+                setTimeout(() => resolve(false), 1000);
             });
         }
 

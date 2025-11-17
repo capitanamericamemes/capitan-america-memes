@@ -305,14 +305,17 @@
         let currentMemes = [];
         let currentImageIndex = 0;
 
-        // Detectar automáticamente todos los memes disponibles
-        let memes = [];
+        // ============================================
+        // 🎯 CONFIGURACIÓN PRINCIPAL - SOLO CAMBIAR ESTE NÚMERO
+        // ============================================
+        const KNOWN_MEME_COUNT = 800;  // <-- SOLO CAMBIAR ESTE NÚMERO CUANDO AÑADAS MÁS MEMES
+        // ============================================
 
-        // Función para detectar memes existentes
+        // Función para detectar memes existentes - VERSION 100% AUTOMATICA
         async function detectMemes() {
-            // FASE 1: Cargar instantáneamente los 650 conocidos
+            // FASE 1: Cargar instantáneamente los memes conocidos
             const knownMemes = [];
-            for (let i = 1; i <= 800; i++) {
+            for (let i = 1; i <= KNOWN_MEME_COUNT; i++) {
                 const paddedNumber = i.toString().padStart(4, '0');
                 knownMemes.push({
                     filename: `Capitan America meme_${paddedNumber}.jpeg`,
@@ -320,7 +323,7 @@
                 });
             }
             
-            // Mostrar inmediatamente los 650
+            // Mostrar inmediatamente los memes conocidos
             allMemes = [...knownMemes];
             currentMemes = [...knownMemes];
             
@@ -329,27 +332,29 @@
             headerP.textContent = `Colección completa de ${knownMemes.length} memes del ascensor - "Hail Hydra" y más`;
             renderGallery();
             
-            // FASE 2: Detectar nuevos memes en segundo plano (651+)
-            detectNewMemesInBackground(knownMemes);
+            // FASE 2: Detectar automáticamente nuevos memes en segundo plano
+            detectNewMemesInBackground(knownMemes, KNOWN_MEME_COUNT);
             
             return knownMemes;
         }
         
-        // Función para detectar memes nuevos en segundo plano
-        async function detectNewMemesInBackground(currentMemes) {
+        // Función para detectar memes nuevos en segundo plano - TOTALMENTE AUTOMATICA
+        async function detectNewMemesInBackground(currentMemes, startFrom) {
             const batchSize = 20;
             let foundNewMemes = false;
             let consecutiveFailures = 0;
             const maxFailures = 50;
             
-            // Empezar desde el 801
-            for (let startIndex = 801; startIndex <= 2000; startIndex += batchSize) {
+            // Empezar automáticamente desde el siguiente al último conocido
+            const startIndex = startFrom + 1;
+            
+            for (let i = startIndex; i <= 2000; i += batchSize) {
                 // Crear lote de verificaciones en paralelo
                 const batchPromises = [];
                 const batchNumbers = [];
                 
-                for (let i = 0; i < batchSize && (startIndex + i) <= 2000; i++) {
-                    const currentNumber = startIndex + i;
+                for (let j = 0; j < batchSize && (i + j) <= 2000; j++) {
+                    const currentNumber = i + j;
                     const paddedNumber = currentNumber.toString().padStart(4, '0');
                     const filename = `Capitan America meme_${paddedNumber}.jpeg`;
                     
@@ -361,9 +366,9 @@
                     const results = await Promise.all(batchPromises);
                     
                     let foundInBatch = false;
-                    for (let i = 0; i < results.length; i++) {
-                        if (results[i]) {
-                            const currentNumber = batchNumbers[i];
+                    for (let j = 0; j < results.length; j++) {
+                        if (results[j]) {
+                            const currentNumber = batchNumbers[j];
                             const paddedNumber = currentNumber.toString().padStart(4, '0');
                             const filename = `Capitan America meme_${paddedNumber}.jpeg`;
                             
@@ -375,7 +380,6 @@
                             
                             currentMemes.push(newMeme);
                             allMemes.push(newMeme);
-                            currentMemes.push(newMeme);
                             
                             foundNewMemes = true;
                             foundInBatch = true;
@@ -403,7 +407,8 @@
                         renderGallery();
                         
                         // Mostrar notificación sutil
-                        showNewMemesNotification(sortedMemes.length - 650);
+                        const newCount = sortedMemes.length - startFrom;
+                        showNewMemesNotification(newCount);
                     } else {
                         consecutiveFailures += batchSize;
                         if (consecutiveFailures >= maxFailures) {
@@ -421,7 +426,7 @@
             
             // Log para debug
             if (foundNewMemes) {
-                console.log(`🎉 Se encontraron ${currentMemes.length - 650} memes nuevos!`);
+                console.log(`🎉 Se encontraron ${currentMemes.length - startFrom} memes nuevos!`);
             }
         }
         
@@ -471,48 +476,17 @@
                 img.onerror = () => resolve(false);
                 img.src = url;
                 
-                // Timeout de 3 segundos
+                // Timeout de 1 segundo
                 setTimeout(() => resolve(false), 1000);
             });
         }
 
-        // Mostrar mensaje de carga
-        function updateLoadingMessage(message) {
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = `
-                <div style="text-align: center; color: white; font-size: 1.2rem; grid-column: 1 / -1;">
-                    <div style="margin: 50px 0;">
-                        <div style="margin-bottom: 20px;">🔍 ${message}</div>
-                        <div style="width: 100%; max-width: 400px; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; margin: 0 auto; overflow: hidden;">
-                            <div style="height: 100%; background: linear-gradient(90deg, #ff6b6b, #4ecdc4); animation: loading 2s infinite linear;"></div>
-                        </div>
-                    </div>
-                </div>
-                <style>
-                    @keyframes loading {
-                        0% { transform: translateX(-100%); }
-                        100% { transform: translateX(100%); }
-                    }
-                </style>
-            `;
-        }
-
-        // Inicializar la galería con detección automática
+        // Inicializar la galería
         async function initGallery() {
-            updateLoadingMessage('Iniciando detección de memes...');
-            
             try {
-                memes = await detectMemes();
-                allMemes = [...memes];
-                currentMemes = [...memes];
+                const memes = await detectMemes();
                 
-                if (memes.length > 0) {
-                    // Actualizar el título con el número total
-                    const headerP = document.querySelector('.header p');
-                    headerP.textContent = `Colección completa de ${memes.length} memes del ascensor`;
-                    
-                    renderGallery();
-                } else {
+                if (memes.length === 0) {
                     // Si no se encontraron memes, mostrar mensaje
                     document.getElementById('gallery').innerHTML = `
                         <div style="text-align: center; color: white; font-size: 1.5rem; grid-column: 1 / -1; margin-top: 50px;">
@@ -649,7 +623,7 @@
             document.body.removeChild(link);
         }
 
-        // Contador de visitas con GoatCounter
+        // Contador de visitas
         function initVisitCounter() {
             // Cargar el script de GoatCounter
             const script = document.createElement('script');
